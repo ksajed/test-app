@@ -8,13 +8,29 @@
     "scheme": "myapp",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.votredomaine.testapp",
+      "buildNumber": "1.0.0",
+      "infoPlist": {
+        "UIStatusBarHidden": false,
+        "UIStatusBarStyle": "UIStatusBarStyleLightContent"
+      }
     },
     "android": {
+      "package": "com.votredomaine.testapp",
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
+        "backgroundColor": "#25292e"
+      },
+      "versionCode": 1,
+      "statusBar": {
+        "barStyle": "light-content",
+        "backgroundColor": "#25292e",
+        "translucent": false
       }
     },
     "web": {

@@ -1,6 +1,7 @@
 import { Tabs } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { StatusBar } from 'expo-status-bar';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 /**
  * TabLayout
@@ -10,7 +11,7 @@ import { StatusBar } from 'expo-status-bar';
  */
 export default function TabLayout() {
   return (
-    <>
+    <GestureHandlerRootView style={{ flex: 1 }}>
       {/* Configuration de la barre de statut */}
       <StatusBar style="light" />
       <Tabs
@@ -53,6 +54,6 @@ export default function TabLayout() {
           }}
         />
       </Tabs>
-    </>
+    </GestureHandlerRootView>
   );
 }
