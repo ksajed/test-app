@@ -1,73 +1,93 @@
-import React, { useState, useMemo } from 'react';
-import { View, StyleSheet, PanResponder, PanResponderInstance } from 'react-native';
+import React, { useState, useRef } from 'react';
+import { View, StyleSheet, GestureResponderEvent } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 
-type DrawingCanvasProps = {
-  isActive: boolean;
-  paths: string[];
-  setPaths: React.Dispatch<React.SetStateAction<string[]>>;
-};
+export interface Point {
+  x: number;
+  y: number;
+}
 
-const DrawingCanvas: React.FC<DrawingCanvasProps> = ({ isActive, paths, setPaths }) => {
-  const [currentPath, setCurrentPath] = useState<string>('');
+export interface DrawingCanvasProps {
+  strokeColor?: string;
+  strokeWidth?: number;
+  enabled: boolean;
+}
 
-  // Recréation du PanResponder à chaque changement de isActive ou currentPath
-  const panResponder = useMemo<PanResponderInstance>(
-    () =>
-      PanResponder.create({
-        onStartShouldSetPanResponder: () => {
-          console.log('onStartShouldSetPanResponder called, isActive:', isActive);
-          return isActive;
-        },
-        onPanResponderGrant: (evt) => {
-          const { locationX, locationY } = evt.nativeEvent;
-          console.log('onPanResponderGrant:', locationX, locationY);
-          setCurrentPath(`M${locationX} ${locationY}`);
-        },
-        onPanResponderMove: (evt) => {
-          const { locationX, locationY } = evt.nativeEvent;
-          console.log('onPanResponderMove:', locationX, locationY);
-          setCurrentPath((prev) => `${prev} L${locationX} ${locationY}`);
-        },
-        onPanResponderRelease: () => {
-          console.log('onPanResponderRelease, currentPath:', currentPath);
-          if (currentPath !== '') {
-            setPaths((prev) => [...prev, currentPath]);
-            setCurrentPath('');
-          }
-        },
-      }),
-    [isActive, currentPath, setPaths]
-  );
+export default function DrawingCanvas({
+  strokeColor = 'red',
+  strokeWidth = 5,
+  enabled,
+}: DrawingCanvasProps) {
+  const [paths, setPaths] = useState<Point[][]>([]);
+  const [currentPath, setCurrentPath] = useState<Point[]>([]);
+
+  const convertPointsToSvgPath = (points: Point[]): string => {
+    if (points.length === 0) return '';
+    let d = `M ${points[0].x} ${points[0].y}`;
+    for (let i = 1; i < points.length; i++) {
+      d += ` L ${points[i].x} ${points[i].y}`;
+    }
+    return d;
+  };
+
+  // On capture les gestes de dessin uniquement si enabled est true
+  const panResponder = useRef({
+    onStartShouldSetResponder: () => enabled,
+    onResponderGrant: (evt: GestureResponderEvent) => {
+      if (!enabled) return;
+      const { locationX, locationY } = evt.nativeEvent;
+      setCurrentPath([{ x: locationX, y: locationY }]);
+    },
+    onResponderMove: (evt: GestureResponderEvent) => {
+      if (!enabled) return;
+      const { locationX, locationY } = evt.nativeEvent;
+      setCurrentPath((prev) => [...prev, { x: locationX, y: locationY }]);
+    },
+    onResponderRelease: () => {
+      if (!enabled) return;
+      const newPath = [...currentPath];
+      if (newPath.length === 1) {
+        newPath.push({ ...newPath[0] });
+      }
+      setPaths((prev) => [...prev, newPath]);
+      setCurrentPath([]);
+    },
+  }).current;
 
   return (
     <View
-      style={[StyleSheet.absoluteFill, styles.canvas]}
-      {...(isActive ? panResponder.panHandlers : {})}
-      collapsable={false}
+      style={styles.canvasContainer}
+      onStartShouldSetResponder={() => enabled}
+      onResponderGrant={panResponder.onResponderGrant}
+      onResponderMove={panResponder.onResponderMove}
+      onResponderRelease={panResponder.onResponderRelease}
     >
-      <Svg style={{ flex: 1 }}>
-        {paths.map((d, index) => (
-          <Path key={index} d={d} stroke="red" strokeWidth={3} fill="none" />
+      <Svg style={StyleSheet.absoluteFill}>
+        {paths.map((points, idx) => (
+          <Path
+            key={idx}
+            d={convertPointsToSvgPath(points)}
+            stroke={strokeColor}
+            strokeWidth={strokeWidth}
+            fill="none"
+          />
         ))}
-        {currentPath !== '' && (
-          <Path d={currentPath} stroke="red" strokeWidth={3} fill="none" />
+        {currentPath.length > 0 && (
+          <Path
+            d={convertPointsToSvgPath(currentPath)}
+            stroke={strokeColor}
+            strokeWidth={strokeWidth}
+            fill="none"
+          />
         )}
       </Svg>
     </View>
   );
-};
+}
 
 const styles = StyleSheet.create({
-  canvas: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    zIndex: 100, // Doit être au-dessus de l'image
+  canvasContainer: {
+    ...StyleSheet.absoluteFillObject,
     backgroundColor: 'transparent',
   },
 });
-
-export default DrawingCanvas;
