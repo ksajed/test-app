@@ -4,50 +4,38 @@ import {
   StyleSheet,
   Alert,
   Image,
-  TouchableOpacity,
+  Text,
+  TextInput,
+  KeyboardAvoidingView,
+  Platform,
+  Share,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
-import {
-  GestureHandlerRootView,
-  PanGestureHandler,
-  PinchGestureHandler,
-  TapGestureHandler,
-  PinchGestureHandlerGestureEvent,
-  PanGestureHandlerGestureEvent,
-  TapGestureHandlerStateChangeEvent,
-} from 'react-native-gesture-handler';
+import { GestureHandlerRootView, Gesture, GestureDetector } from 'react-native-gesture-handler';
 import * as MediaLibrary from 'expo-media-library';
 import { captureRef } from 'react-native-view-shot';
-import { type ImageSource } from 'expo-image';
 import * as Sharing from 'expo-sharing';
-import Animated, {
-  useSharedValue,
-  useAnimatedGestureHandler,
-  useAnimatedStyle,
-  withTiming,
-} from 'react-native-reanimated';
+import Animated, { useSharedValue, useAnimatedStyle, withTiming } from 'react-native-reanimated';
+import { Picker } from '@react-native-picker/picker';
 
 import Button from '@/components/Button';
 import IconButton from '@/components/IconButton';
-import EmojiPicker from '@/components/EmojiPicker';
-import EmojiList from '@/components/EmojiList';
-import EmojiSticker from '@/components/EmojiSticker';
 import DrawingCanvas from '@/components/DrawingCanvas';
 
-const PlaceholderImage = require('@/assets/images/background-image.png');
+// Import des scripts depuis le fichier séparé
+import { monitoringScripts } from '../data/monitoringScripts';
+ 
+// Mettez à jour le chemin si nécessaire
 
-interface Point {
-  x: number;
-  y: number;
-}
+const PlaceholderImage = require('@/assets/images/background-image.png');
 
 export default function Index() {
   const [selectedImage, setSelectedImage] = useState<string | undefined>();
   const [showAppOptions, setShowAppOptions] = useState<boolean>(false);
-  const [isModalVisible, setIsModalVisible] = useState<boolean>(false);
-  const [pickedEmojis, setPickedEmojis] = useState<{ id: number; emoji: ImageSource }[]>([]);
-  // isDrawing contrôle l'interactivité du canvas tout en conservant les tracés
   const [isDrawing, setIsDrawing] = useState(false);
+  const [showCommentPage, setShowCommentPage] = useState(false);
+  const [commentText, setCommentText] = useState('');
+  const [selectedScript, setSelectedScript] = useState<string>('');
 
   const [status, requestPermission] = MediaLibrary.usePermissions();
   const imageRef = useRef<View>(null);
@@ -58,40 +46,46 @@ export default function Index() {
     }
   }, [status]);
 
-  // Variables partagées pour zoom et pan
+  // Valeurs partagées pour zoom et pan
   const scale = useSharedValue(1);
+  const savedScale = useSharedValue(1);
   const translateX = useSharedValue(0);
   const translateY = useSharedValue(0);
 
-  const pinchHandler = useAnimatedGestureHandler<PinchGestureHandlerGestureEvent>({
-    onActive: (evt) => {
-      scale.value = Math.min(Math.max(evt.scale, 0.3), 3);
-    },
-  });
+  // Gestes pour zoom, pan et double tap
+  const pinchGesture = Gesture.Pinch()
+    .onUpdate((e) => {
+      scale.value = Math.min(Math.max(savedScale.value * e.scale, 0.3), 3);
+    })
+    .onEnd(() => {
+      savedScale.value = scale.value;
+    });
 
-  const panHandler = useAnimatedGestureHandler<PanGestureHandlerGestureEvent>({
-    onActive: (evt) => {
+  const panGesture = Gesture.Pan()
+    .onUpdate((e) => {
       if (scale.value > 1) {
-        translateX.value = evt.translationX;
-        translateY.value = evt.translationY;
+        translateX.value = e.translationX;
+        translateY.value = e.translationY;
       }
-    },
-    onEnd: (evt) => {
+    })
+    .onEnd((e) => {
       if (scale.value > 1) {
-        translateX.value = evt.translationX;
-        translateY.value = evt.translationY;
+        translateX.value = e.translationX;
+        translateY.value = e.translationY;
       }
-    },
-  });
+    });
 
-  // Désactivation du TapGestureHandler en mode dessin pour éviter l'interception des touches
-  const doubleTapHandler = useAnimatedGestureHandler<TapGestureHandlerStateChangeEvent>({
-    onActive: () => {
+  const doubleTapGesture = Gesture.Tap()
+    .numberOfTaps(2)
+    .onStart(() => {
       scale.value = withTiming(1);
+      savedScale.value = 1;
       translateX.value = withTiming(0);
       translateY.value = withTiming(0);
-    },
-  });
+    });
+
+  const composedGesture = Gesture.Simultaneous(doubleTapGesture, pinchGesture, panGesture);
+  const dummyGesture = Gesture.Tap().enabled(false);
 
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [
@@ -118,9 +112,23 @@ export default function Index() {
     }
   };
 
+  const onShareComment = async () => {
+    if (!commentText.trim()) {
+      Alert.alert("Aucun commentaire à partager.");
+      return;
+    }
+    try {
+      await Share.share({
+        message: commentText,
+      });
+    } catch (error) {
+      Alert.alert("Erreur de partage", (error as Error).message);
+    }
+  };
+
   const pickImageAsync = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: 'images',
+      mediaTypes: ['images'],
       allowsEditing: false,
       quality: 1,
     });
@@ -139,7 +147,7 @@ export default function Index() {
       return;
     }
     const result = await ImagePicker.launchCameraAsync({
-      mediaTypes: 'images',
+      mediaTypes: ['images'],
       quality: 1,
       allowsEditing: true,
     });
@@ -154,35 +162,21 @@ export default function Index() {
   const onReset = () => {
     setShowAppOptions(false);
     setSelectedImage(undefined);
-    setPickedEmojis([]);
-    // Remise à zéro du mode dessin et des transformations
     setIsDrawing(false);
     scale.value = withTiming(1);
+    savedScale.value = 1;
     translateX.value = withTiming(0);
     translateY.value = withTiming(0);
+    setCommentText('');
+    setSelectedScript('');
   };
 
-  // Active le mode dessin (le DrawingCanvas reste monté)
   const onDrawOnImage = () => {
     setIsDrawing(true);
   };
 
-  // Termine le mode dessin (les tracés restent affichés)
   const onFinishDrawing = () => {
     setIsDrawing(false);
-  };
-
-  const onAddSticker = () => {
-    setIsModalVisible(true);
-  };
-
-  const handleAddSticker = (emoji: ImageSource) => {
-    setPickedEmojis((prev) => [...prev, { id: Date.now(), emoji }]);
-    setIsModalVisible(false);
-  };
-
-  const removeSticker = (id: number) => {
-    setPickedEmojis((prev) => prev.filter((item) => item.id !== id));
   };
 
   const onSaveImageAsync = async () => {
@@ -195,9 +189,22 @@ export default function Index() {
     }
   };
 
+  const openCommentPage = () => {
+    setShowCommentPage(true);
+  };
+
+  const closeCommentPage = () => {
+    setShowCommentPage(false);
+  };
+
+  const handleScriptSelection = (value: string) => {
+    setSelectedScript(value);
+    setCommentText(value);
+  };
+
   return (
     <GestureHandlerRootView style={styles.container}>
-      {/* En mode "page d'accueil", si aucune image n'est sélectionnée, on affiche les deux boutons */}
+      {/* Barre du haut sans le bouton "Dessiner" */}
       {!showAppOptions ? (
         <View style={styles.headerContainer}>
           <Button theme="primary" label="Select Image" onPress={pickImageAsync} />
@@ -209,7 +216,6 @@ export default function Index() {
             <IconButton icon="check" label="Terminer dessin" onPress={onFinishDrawing} />
           ) : (
             <>
-              <IconButton icon="edit" label="Dessiner" onPress={onDrawOnImage} />
               <IconButton icon="refresh" label="Reset" onPress={onReset} />
               <IconButton icon="save-alt" label="Save" onPress={onSaveImageAsync} />
               <IconButton icon="share" label="Partager" onPress={onShare} />
@@ -218,73 +224,70 @@ export default function Index() {
         </View>
       )}
 
-      {/* Zone image avec zoom/dézoom, pan et double tap */}
+      {/* Zone principale : image + dessin */}
       <View style={styles.imageContainer}>
-        <TapGestureHandler enabled={!isDrawing} numberOfTaps={2} onHandlerStateChange={doubleTapHandler}>
-          <Animated.View style={[StyleSheet.absoluteFill, animatedStyle]}>
-            <PinchGestureHandler onGestureEvent={pinchHandler} enabled={!isDrawing}>
-              <Animated.View style={StyleSheet.absoluteFill}>
-                <PanGestureHandler onGestureEvent={panHandler} enabled={!isDrawing}>
-                  <Animated.View style={styles.animatedContainer}>
-                    <View ref={imageRef} collapsable={false} style={{ width: '100%', height: '100%' }}>
-                      {selectedImage ? (
-                        <Image
-                          source={{ uri: selectedImage }}
-                          style={{ width: '100%', height: '100%', resizeMode: 'contain' }}
-                        />
-                      ) : (
-                        <Image
-                          source={PlaceholderImage}
-                          style={{ width: '100%', height: '100%' }}
-                        />
-                      )}
-                      {pickedEmojis.map((item) => (
-                        <TouchableOpacity key={item.id} onPress={() => removeSticker(item.id)}>
-                          <EmojiSticker imageSize={40} stickerSource={item.emoji} />
-                        </TouchableOpacity>
-                      ))}
-                    </View>
-                  </Animated.View>
-                </PanGestureHandler>
-              </Animated.View>
-            </PinchGestureHandler>
+        <GestureDetector gesture={!isDrawing && showAppOptions ? composedGesture : dummyGesture}>
+          <Animated.View style={[styles.animatedContainer, animatedStyle]} ref={imageRef} collapsable={false}>
+            {selectedImage ? (
+              <Image source={{ uri: selectedImage }} style={styles.image} />
+            ) : (
+              <Image source={PlaceholderImage} style={styles.image} />
+            )}
+            {showAppOptions && (
+              <View style={StyleSheet.absoluteFill} pointerEvents={isDrawing ? 'auto' : 'none'}>
+                <DrawingCanvas strokeColor="red" strokeWidth={5} enabled={isDrawing} />
+              </View>
+            )}
           </Animated.View>
-        </TapGestureHandler>
-
-        {/* Container du DrawingCanvas : il capte les touches uniquement en mode dessin */}
-        <View style={StyleSheet.absoluteFill} pointerEvents={isDrawing ? 'auto' : 'none'}>
-          <DrawingCanvas strokeColor="red" strokeWidth={5} enabled={isDrawing} />
-        </View>
+        </GestureDetector>
       </View>
 
-      {/* Barre du bas */}
-      {showAppOptions && (
+      {/* Barre du bas avec le bouton "Commentaire" */}
+      {showAppOptions && !showCommentPage && (
         <View style={styles.footerContainer}>
-          <IconButton
-            icon="comment"
-            label="Commentaire"
-            onPress={() => Alert.alert("Commentaire", "Fonction à implémenter")}
-          />
-          <IconButton
-            icon="help"
-            label="Help"
-            onPress={() => Alert.alert("Help", "Fonction à implémenter")}
-          />
+          <IconButton icon="message" label="Commentaire" onPress={openCommentPage} />
         </View>
       )}
 
-      {/* Emoji Picker */}
-      {isModalVisible && (
-        <EmojiPicker isVisible={isModalVisible} onClose={() => setIsModalVisible(false)}>
-          <EmojiList onSelect={handleAddSticker} onCloseModal={() => setIsModalVisible(false)} />
-        </EmojiPicker>
+      {/* Page de commentaire flottante */}
+      {showCommentPage && (
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          style={styles.commentOverlay}
+        >
+          <View style={styles.floatingCommentContainer}>
+            <Text style={styles.commentTitle}>Commentaires</Text>
+            <View style={styles.pickerContainer}>
+              <Picker selectedValue={selectedScript} onValueChange={(itemValue) => handleScriptSelection(itemValue)}>
+                <Picker.Item label="Sélectionnez un script" value="" />
+                {monitoringScripts.map((script) => (
+                  <Picker.Item label={script.label} value={script.value} key={script.label} />
+                ))}
+              </Picker>
+            </View>
+            <TextInput
+              style={styles.commentInput}
+              multiline
+              placeholder="Saisissez votre commentaire ici..."
+              value={commentText}
+              onChangeText={setCommentText}
+            />
+            <View style={styles.buttonRow}>
+              <Button theme="primary" label="Partager" onPress={onShareComment} />
+              <Button theme="primary" label="Quitter" onPress={closeCommentPage} />
+            </View>
+          </View>
+        </KeyboardAvoidingView>
       )}
     </GestureHandlerRootView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#25292e' },
+  container: {
+    flex: 1,
+    backgroundColor: '#25292e',
+  },
   headerContainer: {
     position: 'absolute',
     top: 20,
@@ -293,21 +296,74 @@ const styles = StyleSheet.create({
     justifyContent: 'space-evenly',
     zIndex: 10,
   },
+  imageContainer: {
+    flex: 1,
+    backgroundColor: '#000',
+  },
+  animatedContainer: {
+    width: '100%',
+    height: '100%',
+  },
+  image: {
+    width: '100%',
+    height: '100%',
+    resizeMode: 'contain',
+  },
   footerContainer: {
     position: 'absolute',
     bottom: 20,
     width: '100%',
-    flexDirection: 'row',
-    justifyContent: 'space-evenly',
+    alignItems: 'center',
     zIndex: 10,
   },
-  imageContainer: {
-    flex: 1,
-    width: '100%',
-    backgroundColor: '#000',
+  commentOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+    zIndex: 20,
   },
-  animatedContainer: {
-    flex: 1,
+  floatingCommentContainer: {
+    backgroundColor: '#fff',
+    padding: 20,
+    width: '90%',
+    borderRadius: 10,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  commentTitle: {
+    fontSize: 20,
+    marginBottom: 20,
+  },
+  pickerContainer: {
+    width: '100%',
+    borderWidth: 1,
+    borderColor: '#ccc',
+    borderRadius: 5,
+    marginBottom: 10,
+  },
+  commentInput: {
+    width: '100%',
+    minHeight: 100,
+    borderColor: '#ccc',
+    borderWidth: 1,
+    borderRadius: 5,
+    padding: 10,
+    marginBottom: 20,
+    textAlignVertical: 'top',
+  },
+  buttonRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     width: '100%',
   },
 });

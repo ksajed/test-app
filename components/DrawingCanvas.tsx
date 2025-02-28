@@ -2,17 +2,27 @@ import React, { useState, useRef } from 'react';
 import { View, StyleSheet, GestureResponderEvent } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 
+/**
+ * Décrit un point (x, y).
+ */
 export interface Point {
   x: number;
   y: number;
 }
 
+/**
+ * Propriétés acceptées par le composant DrawingCanvas.
+ */
 export interface DrawingCanvasProps {
-  strokeColor?: string;
-  strokeWidth?: number;
-  enabled: boolean;
+  strokeColor?: string;   // Couleur du trait
+  strokeWidth?: number;   // Épaisseur du trait
+  enabled: boolean;       // Active ou désactive la capture des gestes
 }
 
+/**
+ * Composant DrawingCanvas : permet de dessiner en capturant les événements tactiles
+ * et en rendant des <Path> dans un <Svg>.
+ */
 export default function DrawingCanvas({
   strokeColor = 'red',
   strokeWidth = 5,
@@ -21,6 +31,7 @@ export default function DrawingCanvas({
   const [paths, setPaths] = useState<Point[][]>([]);
   const [currentPath, setCurrentPath] = useState<Point[]>([]);
 
+  // Convertit un tableau de points en un chemin SVG (M x y, L x y, etc.)
   const convertPointsToSvgPath = (points: Point[]): string => {
     if (points.length === 0) return '';
     let d = `M ${points[0].x} ${points[0].y}`;
@@ -30,7 +41,7 @@ export default function DrawingCanvas({
     return d;
   };
 
-  // On capture les gestes de dessin uniquement si enabled est true
+  // Gestionnaires de gestes pour démarrer, continuer et terminer le tracé
   const panResponder = useRef({
     onStartShouldSetResponder: () => enabled,
     onResponderGrant: (evt: GestureResponderEvent) => {
@@ -46,6 +57,7 @@ export default function DrawingCanvas({
     onResponderRelease: () => {
       if (!enabled) return;
       const newPath = [...currentPath];
+      // Si on n'a qu'un seul point, on le duplique pour que le trait soit visible
       if (newPath.length === 1) {
         newPath.push({ ...newPath[0] });
       }
@@ -57,12 +69,13 @@ export default function DrawingCanvas({
   return (
     <View
       style={styles.canvasContainer}
-      onStartShouldSetResponder={() => enabled}
+      onStartShouldSetResponder={panResponder.onStartShouldSetResponder}
       onResponderGrant={panResponder.onResponderGrant}
       onResponderMove={panResponder.onResponderMove}
       onResponderRelease={panResponder.onResponderRelease}
     >
       <Svg style={StyleSheet.absoluteFill}>
+        {/* Affiche tous les tracés déjà finalisés */}
         {paths.map((points, idx) => (
           <Path
             key={idx}
@@ -72,6 +85,7 @@ export default function DrawingCanvas({
             fill="none"
           />
         ))}
+        {/* Affiche le tracé en cours (celui qu'on est en train de dessiner) */}
         {currentPath.length > 0 && (
           <Path
             d={convertPointsToSvgPath(currentPath)}
