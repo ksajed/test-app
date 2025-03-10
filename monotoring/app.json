@@ -8,12 +8,10 @@
     "scheme": "myapp",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
-    "assetBundlePatterns": [
-      "**/*"
-    ],
+    "assetBundlePatterns": ["**/*"],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.votredomaine.testapp",
+      "bundleIdentifier": "com.zamzam.monotoring",
       "buildNumber": "1.0.0",
       "infoPlist": {
         "UIStatusBarHidden": false,
@@ -21,12 +19,12 @@
       }
     },
     "android": {
-      "package": "com.votredomaine.testapp",
+      "package": "com.zamzam.monotoring",
+      "versionCode": 1,
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#25292e"
       },
-      "versionCode": 1,
       "statusBar": {
         "barStyle": "light-content",
         "backgroundColor": "#25292e",
