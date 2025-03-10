@@ -98,4 +98,5 @@ export const monitoringScripts = [
         'Bonjour Dr [Nom],\nPatiente : [Nom de la patiente]\nSuite à [l’intervention/le geste] réalisé(e) à [heure], l’état post-intervention est le suivant : [description détaillée].\nJe reste en observation et vous tiendrai informé(e) de toute évolution.\nCordialement,\n[Nom de la sage‑femme]',
     },
   ];
+  export default monitoringScripts;
   

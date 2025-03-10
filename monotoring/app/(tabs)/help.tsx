@@ -133,7 +133,7 @@ const ctgHelpData: HelpSection[] = [
   },
   {
     section: 'Interprétation Globale du Tracé',
-    icon: 'monitor-heart',
+    icon: 'file-chart',
     items: [
       {
         title: 'Tracé rassurant (Catégorie I – ACOG)',

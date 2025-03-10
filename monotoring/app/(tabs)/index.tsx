@@ -20,19 +20,15 @@ import { Picker } from '@react-native-picker/picker';
 
 import Button from '@/components/Button';
 import IconButton from '@/components/IconButton';
-import DrawingCanvas from '@/components/DrawingCanvas';
 
 // Import des scripts depuis le fichier séparé
 import { monitoringScripts } from '../data/monitoringScripts';
  
-// Mettez à jour le chemin si nécessaire
-
 const PlaceholderImage = require('@/assets/images/background-image.png');
 
 export default function Index() {
   const [selectedImage, setSelectedImage] = useState<string | undefined>();
   const [showAppOptions, setShowAppOptions] = useState<boolean>(false);
-  const [isDrawing, setIsDrawing] = useState(false);
   const [showCommentPage, setShowCommentPage] = useState(false);
   const [commentText, setCommentText] = useState('');
   const [selectedScript, setSelectedScript] = useState<string>('');
@@ -162,21 +158,12 @@ export default function Index() {
   const onReset = () => {
     setShowAppOptions(false);
     setSelectedImage(undefined);
-    setIsDrawing(false);
     scale.value = withTiming(1);
     savedScale.value = 1;
     translateX.value = withTiming(0);
     translateY.value = withTiming(0);
     setCommentText('');
     setSelectedScript('');
-  };
-
-  const onDrawOnImage = () => {
-    setIsDrawing(true);
-  };
-
-  const onFinishDrawing = () => {
-    setIsDrawing(false);
   };
 
   const onSaveImageAsync = async () => {
@@ -204,7 +191,7 @@ export default function Index() {
 
   return (
     <GestureHandlerRootView style={styles.container}>
-      {/* Barre du haut sans le bouton "Dessiner" */}
+      {/* Barre du haut */}
       {!showAppOptions ? (
         <View style={styles.headerContainer}>
           <Button theme="primary" label="Select Image" onPress={pickImageAsync} />
@@ -212,31 +199,22 @@ export default function Index() {
         </View>
       ) : (
         <View style={styles.headerContainer}>
-          {isDrawing ? (
-            <IconButton icon="check" label="Terminer dessin" onPress={onFinishDrawing} />
-          ) : (
-            <>
-              <IconButton icon="refresh" label="Reset" onPress={onReset} />
-              <IconButton icon="save-alt" label="Save" onPress={onSaveImageAsync} />
-              <IconButton icon="share" label="Partager" onPress={onShare} />
-            </>
-          )}
+          <>
+            <IconButton icon="refresh" label="Reset" onPress={onReset} />
+            <IconButton icon="save-alt" label="Save" onPress={onSaveImageAsync} />
+            <IconButton icon="share" label="Partager" onPress={onShare} />
+          </>
         </View>
       )}
 
-      {/* Zone principale : image + dessin */}
+      {/* Zone principale : image */}
       <View style={styles.imageContainer}>
-        <GestureDetector gesture={!isDrawing && showAppOptions ? composedGesture : dummyGesture}>
+        <GestureDetector gesture={showAppOptions ? composedGesture : dummyGesture}>
           <Animated.View style={[styles.animatedContainer, animatedStyle]} ref={imageRef} collapsable={false}>
             {selectedImage ? (
               <Image source={{ uri: selectedImage }} style={styles.image} />
             ) : (
               <Image source={PlaceholderImage} style={styles.image} />
-            )}
-            {showAppOptions && (
-              <View style={StyleSheet.absoluteFill} pointerEvents={isDrawing ? 'auto' : 'none'}>
-                <DrawingCanvas strokeColor="red" strokeWidth={5} enabled={isDrawing} />
-              </View>
             )}
           </Animated.View>
         </GestureDetector>
